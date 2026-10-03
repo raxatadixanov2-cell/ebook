@@ -209,10 +209,61 @@ def seed():
             address="Nukus shahri, Markaz"
         )
 
-    print("\nKarakalpakstan data seeding completed successfully!")
+    # 6. Create exact Demo Accounts from User Specification/Screenshot
+    first_school = School.objects.first()
+
+    # 1) Superuser (admin / superadmin)
+    admin_user, _ = CustomUser.objects.get_or_create(username="admin")
+    admin_user.set_password("superadmin")
+    admin_user.is_superuser = True
+    admin_user.is_staff = True
+    admin_user.role = "superuser"
+    admin_user.raw_password = "superadmin"
+    admin_user.first_name = "System"
+    admin_user.last_name = "Superadmin"
+    admin_user.save()
+
+    # 2) School Admin (school_admin / password123)
+    s_admin, _ = CustomUser.objects.get_or_create(username="school_admin")
+    s_admin.set_password("password123")
+    s_admin.role = "school_admin"
+    s_admin.school = first_school
+    s_admin.raw_password = "password123"
+    s_admin.first_name = "School"
+    s_admin.last_name = "Admin"
+    s_admin.save()
+
+    # 3) Teacher (teacher_demo / password123)
+    t_demo, _ = CustomUser.objects.get_or_create(username="teacher_demo")
+    t_demo.set_password("password123")
+    t_demo.role = "teacher"
+    t_demo.school = first_school
+    t_demo.subject = "Matematika"
+    t_demo.raw_password = "password123"
+    t_demo.first_name = "Demo"
+    t_demo.last_name = "O'qituvchi"
+    t_demo.save()
+
+    # 4) Student (student_demo / password123)
+    st_demo, _ = CustomUser.objects.get_or_create(username="student_demo")
+    st_demo.set_password("password123")
+    st_demo.role = "student"
+    st_demo.school = first_school
+    st_demo.grade = "9-A"
+    st_demo.raw_password = "password123"
+    st_demo.first_name = "Demo"
+    st_demo.last_name = "O'quvchi"
+    st_demo.save()
+
+    print("\nKarakalpakstan data seeding & Demo Accounts creation completed successfully!")
     print(f"Total Schools: {School.objects.count()}")
     print(f"Total Users: {CustomUser.objects.count()}")
     print(f"Total Books: {Book.objects.count()}")
+    print("\nDemo Accounts Created:")
+    print("  Superuser:    login: admin        | pass: superadmin")
+    print("  School Admin: login: school_admin | pass: password123")
+    print("  Teacher:      login: teacher_demo | pass: password123")
+    print("  Student:      login: student_demo | pass: password123")
 
 if __name__ == '__main__':
     seed()

@@ -33,7 +33,7 @@
                 <button type="submit" class="btn-primary" style="flex: 2; padding: 18px; border-radius: 16px; font-weight: 700;">
                     <i class="fas fa-save"></i> {% trans "Saqlash" %}
                 </button>
-                <a href="{% url 'frontend_admin:muassasalar_list' %}" class="glass-card" style="flex: 1; padding: 18px; border-radius: 16px; text-align: center; text-decoration: none; color: white; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--border); transition: 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+                <a href="{% if cancel_url %}{{ cancel_url }}{% else %}{% url 'frontend_admin:muassasalar_list' %}{% endif %}" class="glass-card" style="flex: 1; padding: 18px; border-radius: 16px; text-align: center; text-decoration: none; color: white; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--border); transition: 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
                     <i class="fas fa-times"></i> {% trans "Bekor qilish" %}
                 </a>
             </div>

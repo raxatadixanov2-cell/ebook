@@ -35,13 +35,42 @@ def seed():
         category=c2, total_count=20, available_count=20, borrow_count=5
     )
     
-    # Create School Admin
-    admin_user = CustomUser.objects.create_user(username="school_admin", password="password123", role="school_admin", school=s1)
-    
-    # Create Student
-    student_user = CustomUser.objects.create_user(username="student_user", password="password123", role="student", school=s1)
+    # 1) Superuser (admin / superadmin)
+    admin_user, _ = CustomUser.objects.get_or_create(username="admin")
+    admin_user.set_password("superadmin")
+    admin_user.is_superuser = True
+    admin_user.is_staff = True
+    admin_user.role = "superuser"
+    admin_user.raw_password = "superadmin"
+    admin_user.save()
 
-    print("Demo data seeded successfully!")
+    # 2) School Admin (school_admin / password123)
+    s_admin, _ = CustomUser.objects.get_or_create(username="school_admin")
+    s_admin.set_password("password123")
+    s_admin.role = "school_admin"
+    s_admin.school = s1
+    s_admin.raw_password = "password123"
+    s_admin.save()
+
+    # 3) Teacher (teacher_demo / password123)
+    t_demo, _ = CustomUser.objects.get_or_create(username="teacher_demo")
+    t_demo.set_password("password123")
+    t_demo.role = "teacher"
+    t_demo.school = s1
+    t_demo.subject = "Matematika"
+    t_demo.raw_password = "password123"
+    t_demo.save()
+
+    # 4) Student (student_demo / password123)
+    st_demo, _ = CustomUser.objects.get_or_create(username="student_demo")
+    st_demo.set_password("password123")
+    st_demo.role = "student"
+    st_demo.school = s1
+    st_demo.grade = "9-A"
+    st_demo.raw_password = "password123"
+    st_demo.save()
+
+    print("Demo data seeded successfully with picture accounts!")
 
 if __name__ == '__main__':
     seed()

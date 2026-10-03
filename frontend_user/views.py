@@ -10,7 +10,10 @@ from django.utils.translation import gettext as _
 @login_required(login_url='login')
 def library(request):
     query = request.GET.get('q')
-    books = Book.objects.filter(school=request.user.school).order_by('-borrow_count')
+    if request.user.school:
+        books = Book.objects.filter(school=request.user.school).order_by('-borrow_count')
+    else:
+        books = Book.objects.all().order_by('-borrow_count')
     
     if query:
         books = books.filter(
@@ -24,7 +27,10 @@ def library(request):
         
     # Get latest news
     from frontend_school.models import News
-    latest_news = News.objects.filter(school=request.user.school, is_published=True).order_by('-created_at')[:3]
+    if request.user.school:
+        latest_news = News.objects.filter(Q(school=request.user.school) | Q(school__isnull=True), is_published=True).order_by('-created_at')[:3]
+    else:
+        latest_news = News.objects.filter(is_published=True).order_by('-created_at')[:3]
         
     return render(request, 'user_panel/library.html', {
         'books': books,

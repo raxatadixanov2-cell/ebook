@@ -486,7 +486,8 @@ def admin_add(request):
             return redirect('frontend_admin:all_users_list')
     else:
         form = SchoolAdminForm()
-    return render(request, 'admin_panel/muassasa_form.html', {'form': form, 'title': _('Yangi maktab admini qo\'shish')})
+    from django.urls import reverse
+    return render(request, 'admin_panel/muassasa_form.html', {'form': form, 'title': _('Yangi maktab admini qo\'shish'), 'cancel_url': reverse('frontend_admin:all_users_list')})
 
 @login_required(login_url='login')
 @superuser_required
@@ -503,7 +504,8 @@ def admin_edit(request, pk):
             return redirect('frontend_admin:all_users_list')
     else:
         form = SchoolAdminForm(instance=admin)
-    return render(request, 'admin_panel/muassasa_form.html', {'form': form, 'title': _('Admin ma\'lumotlarini tahrirlash')})
+    from django.urls import reverse
+    return render(request, 'admin_panel/muassasa_form.html', {'form': form, 'title': _('Admin ma\'lumotlarini tahrirlash'), 'cancel_url': reverse('frontend_admin:all_users_list')})
 
 @login_required(login_url='login')
 @superuser_required

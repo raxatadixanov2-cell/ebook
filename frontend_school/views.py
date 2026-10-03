@@ -1,7 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 
-school_admin_required = user_passes_test(lambda u: u.role == 'school_admin' and u.school is not None, login_url='login')
+def is_school_admin_or_superuser(user):
+    return user.is_authenticated and (user.role == 'school_admin' or user.is_superuser)
+
+school_admin_required = user_passes_test(is_school_admin_or_superuser, login_url='login')
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Sum, Q
@@ -18,6 +21,7 @@ import string
 from accounts.models import CustomUser
 from accounts.utils import verify_dynamic_token
 from books.models import Book, BookIssue, BookRequest, Category
+from schools.models import School
 from stats.models import ActionLog
 from .models import News
 from .forms import BookForm, StudentForm, TeacherForm, NewsForm
@@ -25,9 +29,9 @@ from .forms import BookForm, StudentForm, TeacherForm, NewsForm
 @login_required(login_url='login')
 @school_admin_required
 def dashboard(request):
-    if request.user.role != 'school_admin':
+    if request.user.role != 'school_admin' and not request.user.is_superuser:
         return redirect('frontend_user:library')
-    school = request.user.school
+    school = request.user.school or School.objects.first()
     context = {}
     if school:
         recent_activities = BookIssue.objects.filter(book__school=school).order_by('-issued_at')[:5]
@@ -35,10 +39,8 @@ def dashboard(request):
             total_copies=Sum('total_count'),
             available_copies=Sum('available_count')
         )
-        from django.db.models import Q
         # Base news filter: current school's news
         news_filter = Q(school=school)
-        # Only school admins and superusers see global news
         if request.user.role == 'school_admin' or request.user.is_superuser:
             news_filter |= Q(school__isnull=True)
             
@@ -214,28 +216,28 @@ def process_qr_unified(request):
 
 @csrf_exempt
 def process_qr(request):
-    if not request.user.is_authenticated or request.user.role != 'school_admin':
+    if not request.user.is_authenticated or (request.user.role != 'school_admin' and not request.user.is_superuser):
         return JsonResponse({'status': 'error', 'message': 'Ruxsat etilmagan'})
         
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            token = data.get('token')
+            token = data.get('token', '')
             
             from accounts.utils import verify_dynamic_token
             request_id = verify_dynamic_token(token, 'REQ')
             
-            if not request_id:
-                return JsonResponse({'status': 'error', 'message': _('Eski yoki noto\'g\'ri QR-kod. Iltimos, o\'quvchi telefonida kodni yangilasini kutib turing.')})
+            request_obj = None
+            if request_id:
+                request_obj = BookRequest.objects.filter(id=request_id, status='pending').first()
+            if not request_obj:
+                request_obj = BookRequest.objects.filter(qr_token=token, status='pending').first()
             
-            
-            try:
-                request_obj = BookRequest.objects.get(id=request_id, status='pending')
-            except BookRequest.DoesNotExist:
-                return JsonResponse({'status': 'error', 'message': _('Bron topilmadi yoki allaqachon tasdiqlangan')})
+            if not request_obj:
+                return JsonResponse({'status': 'error', 'message': _('Eski yoki noto\'g\'ri QR-kod. Bron topilmadi yoki allaqachon tasdiqlangan.')})
             
             # [CRITICAL CHECK] Ensure the student belongs to the librarian's school
-            if request_obj.user.school != request.user.school:
+            if request.user.school and request_obj.user.school != request.user.school and not request.user.is_superuser:
                 return JsonResponse({'status': 'error', 'message': _('Xatolik: Ushbu o\'quvchi boshqa maktabga tegishli!')})
             
             # Check if book is available
@@ -260,10 +262,11 @@ def process_qr(request):
                 message=_("{}ga '{}' kitobi berildi").format(request_obj.user.username, book.title)
             )
             
+            student_name = request_obj.user.get_full_name().strip() or request_obj.user.username
             return JsonResponse({
                 'status': 'success', 
                 'message': _('Kitob muvaffaqiyatli berildi: {}').format(book.title),
-                'student': f'{request_obj.user.first_name} {request_obj.user.last_name}'
+                'student': student_name
             })
             
         except Exception as e:
@@ -273,31 +276,28 @@ def process_qr(request):
 
 @csrf_exempt
 def process_receive_qr(request):
-    if not request.user.is_authenticated or request.user.role != 'school_admin':
+    if not request.user.is_authenticated or (request.user.role != 'school_admin' and not request.user.is_superuser):
         return JsonResponse({'status': 'error', 'message': 'Ruxsat etilmagan'})
         
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            token = data.get('token')
+            token = data.get('token', '')
             
             from accounts.utils import verify_dynamic_token
             issue_id = verify_dynamic_token(token, 'RET')
             
-            if not issue_id:
-                return JsonResponse({'status': 'error', 'message': _('Eski yoki noto\'g\'ri QR-kod')})
+            issue = None
+            if issue_id:
+                issue = BookIssue.objects.filter(id=issue_id, is_returned=False).first()
+            if not issue:
+                issue = BookIssue.objects.filter(qr_token=token, is_returned=False).first()
                 
-            from books.models import BookIssue
-            from django.utils import timezone
-            from stats.models import ActionLog
-            
-            try:
-                issue = BookIssue.objects.get(id=issue_id, is_returned=False)
-            except BookIssue.DoesNotExist:
-                return JsonResponse({'status': 'error', 'message': _('Ushbu kitob uchun faol topshirish topilmadi')})
+            if not issue:
+                return JsonResponse({'status': 'error', 'message': _('Ushbu kitob uchun faol topshirish topilmadi yoki QR-kod eskirgan.')})
             
             # [CRITICAL CHECK] Ensure the student belongs to the librarian's school
-            if issue.user.school != request.user.school:
+            if request.user.school and issue.user.school != request.user.school and not request.user.is_superuser:
                 return JsonResponse({'status': 'error', 'message': _('Xatolik: Ushbu o\'quvchi boshqa maktabga tegishli!')})
             
             book = issue.book
@@ -323,10 +323,11 @@ def process_receive_qr(request):
                 message=_("{}dan '{}' kitobi qabul qilindi").format(user.username, book.title)
             )
             
+            student_name = user.get_full_name().strip() or user.username
             return JsonResponse({
                 'status': 'success', 
                 'message': _('Kitob muvaffaqiyatli qabul qilindi: {}').format(book.title),
-                'student': f'{user.first_name} {user.last_name}'
+                'student': student_name
             })
             
         except Exception as e:
